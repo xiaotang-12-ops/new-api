@@ -55,6 +55,7 @@ const OperationSetting = () => {
 
     /* 左侧边栏模块管理（管理员） */
     SidebarModulesAdmin: '',
+    SidebarModulesAdminAdmin: '',
 
     /* 敏感词设置 */
     CheckSensitiveEnabled: false,

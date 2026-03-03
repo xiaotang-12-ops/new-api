@@ -28,6 +28,8 @@ func AllOption() ([]*Option, error) {
 func InitOptionMap() {
 	common.OptionMapRWMutex.Lock()
 	common.OptionMap = make(map[string]string)
+	defaultHeaderNavModules := `{"home":true,"console":true,"pricing":{"enabled":true,"requireAuth":false},"docs":true,"about":true}`
+	defaultSidebarModules := `{"chat":{"enabled":true,"playground":true,"chat":true},"console":{"enabled":true,"detail":true,"token":true,"log":true,"midjourney":true,"task":true},"personal":{"enabled":true,"topup":true,"personal":true},"admin":{"enabled":true,"channel":true,"models":true,"deployment":true,"redemption":true,"user":true,"setting":true}}`
 
 	// 添加原有的系统配置
 	common.OptionMap["FileUploadPermission"] = strconv.Itoa(common.FileUploadPermission)
@@ -67,6 +69,10 @@ func InitOptionMap() {
 	common.OptionMap["Footer"] = common.Footer
 	common.OptionMap["SystemName"] = common.SystemName
 	common.OptionMap["Logo"] = common.Logo
+	common.OptionMap["HeaderNavModules"] = defaultHeaderNavModules
+	common.OptionMap["HeaderNavModulesAdmin"] = defaultHeaderNavModules
+	common.OptionMap["SidebarModulesAdmin"] = defaultSidebarModules
+	common.OptionMap["SidebarModulesAdminAdmin"] = defaultSidebarModules
 	common.OptionMap["ServerAddress"] = ""
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
 	common.OptionMap["WorkerValidKey"] = system_setting.WorkerValidKey

@@ -3,12 +3,84 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
 )
+
+func isPrivilegedLogViewer(role int) bool {
+	return role >= common.RoleAdminUser
+}
+
+func isSensitiveRealModelField(key string) bool {
+	normalizedKey := strings.ToLower(strings.TrimSpace(key))
+	if normalizedKey == "" {
+		return false
+	}
+	switch normalizedKey {
+	case "upstream_model_name", "upstream_model", "actual_model", "real_model",
+		"target_model", "provider_model", "origin_model", "origin_model_name",
+		"original_model", "original_model_name", "actual_request_model":
+		return true
+	}
+	sensitiveKeyTokens := []string{
+		"upstream_model",
+		"actual_model",
+		"real_model",
+		"target_model",
+		"provider_model",
+		"origin_model",
+		"original_model",
+	}
+	for _, token := range sensitiveKeyTokens {
+		if strings.Contains(normalizedKey, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSafeOtherFieldForStandardViewer(key string) bool {
+	normalizedKey := strings.ToLower(strings.TrimSpace(key))
+	switch normalizedKey {
+	case "request_path", "frt", "group", "error_type", "error_code", "status_code":
+		return true
+	default:
+		return false
+	}
+}
+
+func sanitizeLogForViewer(log *model.Log, isPrivileged bool) {
+	if log == nil || isPrivileged || log.Other == "" {
+		return
+	}
+	otherMap, _ := common.StrToMap(log.Other)
+	if otherMap == nil {
+		return
+	}
+
+	// Standard users only receive a strict allow-list of safe metadata.
+	// This prevents exposing upstream routing details and billing internals.
+	safeOtherMap := make(map[string]interface{})
+	for key, value := range otherMap {
+		if isSensitiveRealModelField(key) {
+			continue
+		}
+		if isSafeOtherFieldForStandardViewer(key) {
+			safeOtherMap[key] = value
+		}
+	}
+	log.Other = common.MapToJsonStr(safeOtherMap)
+}
+
+func sanitizeLogsForViewer(logs []*model.Log, isPrivileged bool) {
+	for _, log := range logs {
+		sanitizeLogForViewer(log, isPrivileged)
+	}
+}
 
 func GetAllLogs(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
@@ -34,6 +106,7 @@ func GetAllLogs(c *gin.Context) {
 func GetUserLogs(c *gin.Context) {
 	pageInfo := common.GetPageQuery(c)
 	userId := c.GetInt("id")
+	isPrivileged := isPrivilegedLogViewer(c.GetInt("role"))
 	logType, _ := strconv.Atoi(c.Query("type"))
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
@@ -45,6 +118,7 @@ func GetUserLogs(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	sanitizeLogsForViewer(logs, isPrivileged)
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(logs)
 	common.ApiSuccess(c, pageInfo)
@@ -69,11 +143,13 @@ func SearchAllLogs(c *gin.Context) {
 func SearchUserLogs(c *gin.Context) {
 	keyword := c.Query("keyword")
 	userId := c.GetInt("id")
+	isPrivileged := isPrivilegedLogViewer(c.GetInt("role"))
 	logs, err := model.SearchUserLogs(userId, keyword)
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	sanitizeLogsForViewer(logs, isPrivileged)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -92,6 +168,8 @@ func GetLogByKey(c *gin.Context) {
 		})
 		return
 	}
+	// This endpoint is intentionally unauthenticated, so never return real/upstream model fields.
+	sanitizeLogsForViewer(logs, false)
 	c.JSON(200, gin.H{
 		"success": true,
 		"message": "",

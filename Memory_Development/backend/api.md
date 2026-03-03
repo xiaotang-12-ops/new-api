@@ -30,6 +30,19 @@
 
 提示：`/api` 下端点较多，详细以源码为准：`router/api-router.go`
 
+### `/api/log`（日志与用量记录）
+入口：`router/api-router.go`、`controller/log.go`
+
+| 方法 | 路径 | 权限/鉴权 | 字段可见性说明 |
+|---|---|---|---|
+| GET | `/api/log/` | AdminAuth | 管理员日志列表，可见完整字段（含上游模型相关字段） |
+| GET | `/api/log/search` | AdminAuth | 管理员日志检索，可见完整字段 |
+| GET | `/api/log/stat` | AdminAuth | 管理员日志统计 |
+| GET | `/api/log/self` | UserAuth | 普通用户后端白名单脱敏：`other` 仅保留安全字段（如 `request_path`、`frt` 等），隐藏实际模型与计费过程相关字段；Admin/Root 保持可见 |
+| GET | `/api/log/self/search` | UserAuth | 同上，按角色白名单脱敏 |
+| GET | `/api/log/self/stat` | UserAuth | 用户日志统计 |
+| GET | `/api/log/token` | 无（CORS） | 公开查询接口，统一按非管理员白名单脱敏，避免泄露上游映射与计费细节 |
+
 ## `/dashboard` 与 `/v1/dashboard`（OpenAI dashboard billing/usage 兼容）
 入口：`router/dashboard.go`
 

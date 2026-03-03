@@ -18,10 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { lazy, Suspense, useContext, useMemo } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Loading from './components/common/ui/Loading';
 import User from './pages/User';
-import { AuthRedirect, PrivateRoute, AdminRoute } from './helpers';
+import {
+  AuthRedirect,
+  PrivateRoute,
+  AdminRoute,
+  SidebarModuleRoute,
+} from './helpers';
 import RegisterForm from './components/auth/RegisterForm';
 import LoginForm from './components/auth/LoginForm';
 import NotFound from './pages/NotFound';
@@ -48,12 +53,46 @@ import OAuth2Callback from './components/auth/OAuth2Callback';
 import PersonalSetting from './components/settings/PersonalSetting';
 import Setup from './pages/Setup';
 import SetupCheck from './components/layout/SetupCheck';
+import { useSidebar } from './hooks/common/useSidebar';
 
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const About = lazy(() => import('./pages/About'));
 const UserAgreement = lazy(() => import('./pages/UserAgreement'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+
+function ConsoleLandingRoute() {
+  const { loading, isModuleVisible } = useSidebar();
+
+  if (loading) {
+    return <Loading />;
+  }
+
+  if (isModuleVisible('console', 'detail')) {
+    return (
+      <Suspense fallback={<Loading />}>
+        <Dashboard />
+      </Suspense>
+    );
+  }
+
+  const consoleFallbackRoutes = [
+    { moduleKey: 'token', path: '/console/token' },
+    { moduleKey: 'log', path: '/console/log' },
+    { moduleKey: 'midjourney', path: '/console/midjourney' },
+    { moduleKey: 'task', path: '/console/task' },
+  ];
+
+  const firstVisibleRoute = consoleFallbackRoutes.find((item) =>
+    isModuleVisible('console', item.moduleKey),
+  );
+
+  if (firstVisibleRoute) {
+    return <Navigate to={firstVisibleRoute.path} replace />;
+  }
+
+  return <Navigate to='/forbidden' replace />;
+}
 
 function App() {
   const location = useLocation();
@@ -105,7 +144,9 @@ function App() {
           path='/console/models'
           element={
             <AdminRoute>
-              <ModelPage />
+              <SidebarModuleRoute sectionKey='admin' moduleKey='models'>
+                <ModelPage />
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -113,7 +154,9 @@ function App() {
           path='/console/deployment'
           element={
             <AdminRoute>
-              <ModelDeploymentPage />
+              <SidebarModuleRoute sectionKey='admin' moduleKey='deployment'>
+                <ModelDeploymentPage />
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -121,7 +164,9 @@ function App() {
           path='/console/channel'
           element={
             <AdminRoute>
-              <Channel />
+              <SidebarModuleRoute sectionKey='admin' moduleKey='channel'>
+                <Channel />
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -129,7 +174,9 @@ function App() {
           path='/console/token'
           element={
             <PrivateRoute>
-              <Token />
+              <SidebarModuleRoute sectionKey='console' moduleKey='token'>
+                <Token />
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -137,7 +184,9 @@ function App() {
           path='/console/playground'
           element={
             <PrivateRoute>
-              <Playground />
+              <SidebarModuleRoute sectionKey='chat' moduleKey='playground'>
+                <Playground />
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -145,7 +194,9 @@ function App() {
           path='/console/redemption'
           element={
             <AdminRoute>
-              <Redemption />
+              <SidebarModuleRoute sectionKey='admin' moduleKey='redemption'>
+                <Redemption />
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -153,7 +204,9 @@ function App() {
           path='/console/user'
           element={
             <AdminRoute>
-              <User />
+              <SidebarModuleRoute sectionKey='admin' moduleKey='user'>
+                <User />
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -229,9 +282,11 @@ function App() {
           path='/console/setting'
           element={
             <AdminRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Setting />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='admin' moduleKey='setting'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <Setting />
+                </Suspense>
+              </SidebarModuleRoute>
             </AdminRoute>
           }
         />
@@ -239,9 +294,11 @@ function App() {
           path='/console/personal'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <PersonalSetting />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='personal' moduleKey='personal'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <PersonalSetting />
+                </Suspense>
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -249,9 +306,11 @@ function App() {
           path='/console/topup'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <TopUp />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='personal' moduleKey='topup'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <TopUp />
+                </Suspense>
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -259,7 +318,9 @@ function App() {
           path='/console/log'
           element={
             <PrivateRoute>
-              <Log />
+              <SidebarModuleRoute sectionKey='console' moduleKey='log'>
+                <Log />
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -267,9 +328,7 @@ function App() {
           path='/console'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Dashboard />
-              </Suspense>
+              <ConsoleLandingRoute />
             </PrivateRoute>
           }
         />
@@ -277,9 +336,11 @@ function App() {
           path='/console/midjourney'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Midjourney />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='console' moduleKey='midjourney'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <Midjourney />
+                </Suspense>
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -287,9 +348,11 @@ function App() {
           path='/console/task'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Task />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='console' moduleKey='task'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <Task />
+                </Suspense>
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />
@@ -339,9 +402,13 @@ function App() {
         <Route
           path='/console/chat/:id?'
           element={
-            <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-              <Chat />
-            </Suspense>
+            <PrivateRoute>
+              <SidebarModuleRoute sectionKey='chat' moduleKey='chat'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <Chat />
+                </Suspense>
+              </SidebarModuleRoute>
+            </PrivateRoute>
           }
         />
         {/* 方便使用chat2link直接跳转聊天... */}
@@ -349,9 +416,11 @@ function App() {
           path='/chat2link'
           element={
             <PrivateRoute>
-              <Suspense fallback={<Loading></Loading>} key={location.pathname}>
-                <Chat2Link />
-              </Suspense>
+              <SidebarModuleRoute sectionKey='chat' moduleKey='chat'>
+                <Suspense fallback={<Loading></Loading>} key={location.pathname}>
+                  <Chat2Link />
+                </Suspense>
+              </SidebarModuleRoute>
             </PrivateRoute>
           }
         />

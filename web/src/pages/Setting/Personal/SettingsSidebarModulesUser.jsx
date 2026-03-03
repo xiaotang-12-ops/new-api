@@ -41,6 +41,7 @@ export default function SettingsSidebarModulesUser() {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [statusState] = useContext(StatusContext);
+  const [userState] = useContext(UserContext);
 
   // 使用后端权限验证替代前端角色判断
   const {
@@ -196,12 +197,16 @@ export default function SettingsSidebarModulesUser() {
   useEffect(() => {
     const loadConfigs = async () => {
       try {
+        const isPrivilegedUser = (userState?.user?.role || 0) >= 10;
+        const rawAdminConfig = isPrivilegedUser
+          ? statusState?.status?.SidebarModulesAdminAdmin ||
+            statusState?.status?.SidebarModulesAdmin
+          : statusState?.status?.SidebarModulesAdmin;
+
         // 获取管理员全局配置
-        if (statusState?.status?.SidebarModulesAdmin) {
+        if (rawAdminConfig) {
           try {
-            const adminConf = JSON.parse(
-              statusState.status.SidebarModulesAdmin,
-            );
+            const adminConf = JSON.parse(rawAdminConfig);
             const mergedAdminConf = mergeAdminConfig(adminConf);
             setAdminConfig(mergedAdminConf);
             console.log('加载管理员边栏配置:', mergedAdminConf);
@@ -268,7 +273,9 @@ export default function SettingsSidebarModulesUser() {
       loadConfigs();
     }
   }, [
-    statusState,
+    statusState?.status?.SidebarModulesAdmin,
+    statusState?.status?.SidebarModulesAdminAdmin,
+    userState?.user?.role,
     permissionsLoading,
     hasSidebarSettingsPermission,
     isSidebarSectionAllowed,

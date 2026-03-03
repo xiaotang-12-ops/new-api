@@ -349,7 +349,7 @@ export const useLogsData = () => {
           value: other.cache_creation_tokens,
         });
       }
-      if (logs[i].type === 2) {
+      if (logs[i].type === 2 && isAdminUser) {
         expandDataLocal.push({
           key: t('日志详情'),
           value: other?.claude
@@ -388,7 +388,7 @@ export const useLogsData = () => {
           });
         }
       }
-      if (logs[i].type === 2) {
+      if (logs[i].type === 2 && isAdminUser) {
         let modelMapped =
           other?.is_model_mapped &&
           other?.upstream_model_name &&

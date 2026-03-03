@@ -20,6 +20,8 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { history } from './history';
+import { useSidebar } from '../hooks/common/useSidebar';
+import Loading from '../components/common/ui/Loading';
 
 export function authHeader() {
   // return authorization header with jwt token
@@ -63,6 +65,24 @@ export function AdminRoute({ children }) {
     // ignore
   }
   return <Navigate to='/forbidden' replace />;
+}
+
+export function SidebarModuleRoute({ sectionKey, moduleKey, children }) {
+  const raw = localStorage.getItem('user');
+  if (!raw) {
+    return <Navigate to='/login' state={{ from: history.location }} />;
+  }
+
+  const { loading, isModuleVisible } = useSidebar();
+  if (loading) {
+    return <Loading />;
+  }
+
+  if (!isModuleVisible(sectionKey, moduleKey)) {
+    return <Navigate to='/forbidden' replace />;
+  }
+
+  return children;
 }
 
 export { PrivateRoute };

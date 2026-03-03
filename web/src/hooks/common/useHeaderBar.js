@@ -28,6 +28,59 @@ import { useIsMobile } from './useIsMobile';
 import { useSidebarCollapsed } from './useSidebarCollapsed';
 import { useMinimumLoadingTime } from './useMinimumLoadingTime';
 
+const DEFAULT_HEADER_NAV_MODULES = {
+  home: true,
+  console: true,
+  pricing: {
+    enabled: true,
+    requireAuth: false,
+  },
+  docs: true,
+  about: true,
+};
+
+const cloneDefaultHeaderNavModules = () =>
+  JSON.parse(JSON.stringify(DEFAULT_HEADER_NAV_MODULES));
+
+const normalizeHeaderNavModules = (modules) => {
+  const normalized = cloneDefaultHeaderNavModules();
+
+  if (!modules || typeof modules !== 'object') {
+    return normalized;
+  }
+
+  ['home', 'console', 'docs', 'about'].forEach((key) => {
+    if (typeof modules[key] === 'boolean') {
+      normalized[key] = modules[key];
+    }
+  });
+
+  if (typeof modules.pricing === 'boolean') {
+    normalized.pricing.enabled = modules.pricing;
+  } else if (modules.pricing && typeof modules.pricing === 'object') {
+    if (typeof modules.pricing.enabled === 'boolean') {
+      normalized.pricing.enabled = modules.pricing.enabled;
+    }
+    if (typeof modules.pricing.requireAuth === 'boolean') {
+      normalized.pricing.requireAuth = modules.pricing.requireAuth;
+    }
+  }
+
+  return normalized;
+};
+
+const parseHeaderNavModulesConfig = (config) => {
+  if (!config) {
+    return null;
+  }
+  try {
+    return normalizeHeaderNavModules(JSON.parse(config));
+  } catch (error) {
+    console.error('解析顶栏模块配置失败:', error);
+    return null;
+  }
+};
+
 export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
   const { t, i18n } = useTranslation();
   const [userState, userDispatch] = useContext(UserContext);
@@ -51,31 +104,34 @@ export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
   const docsLink = statusState?.status?.docs_link || '';
   const isDemoSiteMode = statusState?.status?.demo_site_enabled || false;
 
-  // 获取顶栏模块配置
-  const headerNavModulesConfig = statusState?.status?.HeaderNavModules;
+  // 获取顶栏模块配置（普通用户/管理员分离）
+  const headerNavModulesUserConfig = statusState?.status?.HeaderNavModules;
+  const headerNavModulesAdminConfig =
+    statusState?.status?.HeaderNavModulesAdmin;
+  const isAdminUser =
+    !!userState?.user &&
+    typeof userState.user.role === 'number' &&
+    userState.user.role >= 10;
 
-  // 使用useMemo确保headerNavModules正确响应statusState变化
+  // 使用 useMemo 确保顶栏配置正确响应状态变化
   const headerNavModules = useMemo(() => {
-    if (headerNavModulesConfig) {
-      try {
-        const modules = JSON.parse(headerNavModulesConfig);
-
-        // 处理向后兼容性：如果pricing是boolean，转换为对象格式
-        if (typeof modules.pricing === 'boolean') {
-          modules.pricing = {
-            enabled: modules.pricing,
-            requireAuth: false, // 默认不需要登录鉴权
-          };
-        }
-
-        return modules;
-      } catch (error) {
-        console.error('解析顶栏模块配置失败:', error);
-        return null;
-      }
+    if (isAdminUser) {
+      // 管理员优先读取独立配置，缺省时默认全开，避免误伤管理入口。
+      return (
+        parseHeaderNavModulesConfig(headerNavModulesAdminConfig) ||
+        cloneDefaultHeaderNavModules()
+      );
     }
-    return null;
-  }, [headerNavModulesConfig]);
+
+    return (
+      parseHeaderNavModulesConfig(headerNavModulesUserConfig) ||
+      cloneDefaultHeaderNavModules()
+    );
+  }, [
+    headerNavModulesUserConfig,
+    headerNavModulesAdminConfig,
+    isAdminUser,
+  ]);
 
   // 获取模型广场权限配置
   const pricingRequireAuth = useMemo(() => {

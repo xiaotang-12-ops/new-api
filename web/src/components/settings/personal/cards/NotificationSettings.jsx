@@ -181,12 +181,16 @@ const NotificationSettings = ({
   useEffect(() => {
     const loadSidebarConfigs = async () => {
       try {
+        const isPrivilegedUser = (userState?.user?.role || 0) >= 10;
+        const rawAdminConfig = isPrivilegedUser
+          ? statusState?.status?.SidebarModulesAdminAdmin ||
+            statusState?.status?.SidebarModulesAdmin
+          : statusState?.status?.SidebarModulesAdmin;
+
         // 获取管理员全局配置
-        if (statusState?.status?.SidebarModulesAdmin) {
+        if (rawAdminConfig) {
           try {
-            const adminConf = JSON.parse(
-              statusState.status.SidebarModulesAdmin,
-            );
+            const adminConf = JSON.parse(rawAdminConfig);
             setAdminConfig(mergeAdminConfig(adminConf));
           } catch (error) {
             setAdminConfig(mergeAdminConfig(null));
@@ -212,7 +216,11 @@ const NotificationSettings = ({
     };
 
     loadSidebarConfigs();
-  }, [statusState]);
+  }, [
+    statusState?.status?.SidebarModulesAdmin,
+    statusState?.status?.SidebarModulesAdminAdmin,
+    userState?.user?.role,
+  ]);
 
   // 初始化表单值
   useEffect(() => {

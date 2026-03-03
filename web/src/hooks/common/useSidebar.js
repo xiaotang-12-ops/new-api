@@ -21,7 +21,7 @@ import { useState, useEffect, useMemo, useContext, useRef } from 'react';
 import { StatusContext } from '../../context/Status';
 import { API } from '../../helpers';
 
-// 创建一个全局事件系统来同步所有useSidebar实例
+// 创建一个全局事件系统来同步所有 useSidebar 实例
 const sidebarEventTarget = new EventTarget();
 const SIDEBAR_REFRESH_EVENT = 'sidebar-refresh';
 
@@ -57,6 +57,64 @@ export const DEFAULT_ADMIN_CONFIG = {
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
+const getCurrentUserRole = () => {
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) return 0;
+    const user = JSON.parse(rawUser);
+    return typeof user?.role === 'number' ? user.role : 0;
+  } catch (error) {
+    return 0;
+  }
+};
+
+const hasLocalUserSession = () => {
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (!rawUser) return false;
+    const user = JSON.parse(rawUser);
+    return !!(user && user.token);
+  } catch (error) {
+    return false;
+  }
+};
+
+const parseSidebarConfig = (rawConfig) => {
+  if (!rawConfig) {
+    return mergeAdminConfig(null);
+  }
+
+  if (typeof rawConfig === 'string') {
+    try {
+      return mergeAdminConfig(JSON.parse(rawConfig));
+    } catch (error) {
+      return mergeAdminConfig(null);
+    }
+  }
+
+  if (typeof rawConfig === 'object') {
+    return mergeAdminConfig(rawConfig);
+  }
+
+  return mergeAdminConfig(null);
+};
+
+const buildDefaultUserConfig = (adminConfig) => {
+  const defaultUserConfig = {};
+  Object.keys(adminConfig).forEach((sectionKey) => {
+    if (!adminConfig[sectionKey]?.enabled) return;
+
+    defaultUserConfig[sectionKey] = { enabled: true };
+    Object.keys(adminConfig[sectionKey]).forEach((moduleKey) => {
+      if (moduleKey === 'enabled') return;
+      if (adminConfig[sectionKey][moduleKey]) {
+        defaultUserConfig[sectionKey][moduleKey] = true;
+      }
+    });
+  });
+  return defaultUserConfig;
+};
+
 export const mergeAdminConfig = (savedConfig) => {
   const merged = deepClone(DEFAULT_ADMIN_CONFIG);
   if (!savedConfig || typeof savedConfig !== 'object') return merged;
@@ -87,20 +145,25 @@ export const useSidebar = () => {
     instanceIdRef.current = `sidebar-${Date.now()}-${randomPart}`;
   }
 
-  // 获取管理员配置
-  const adminConfig = useMemo(() => {
-    if (statusState?.status?.SidebarModulesAdmin) {
-      try {
-        const config = JSON.parse(statusState.status.SidebarModulesAdmin);
-        return mergeAdminConfig(config);
-      } catch (error) {
-        return mergeAdminConfig(null);
-      }
-    }
-    return mergeAdminConfig(null);
-  }, [statusState?.status?.SidebarModulesAdmin]);
+  const userRole = getCurrentUserRole();
+  const isPrivilegedUser = userRole >= 10;
 
-  // 加载用户配置的通用方法
+  // 按角色选择侧边栏全局配置：
+  // - 普通用户：SidebarModulesAdmin
+  // - 管理员/Root：SidebarModulesAdminAdmin（兼容缺省回退 SidebarModulesAdmin）
+  const adminConfig = useMemo(() => {
+    const userScopedConfig = statusState?.status?.SidebarModulesAdmin;
+    const adminScopedConfig = statusState?.status?.SidebarModulesAdminAdmin;
+    const selectedConfig = isPrivilegedUser
+      ? adminScopedConfig || userScopedConfig
+      : userScopedConfig;
+    return parseSidebarConfig(selectedConfig);
+  }, [
+    statusState?.status?.SidebarModulesAdmin,
+    statusState?.status?.SidebarModulesAdminAdmin,
+    isPrivilegedUser,
+  ]);
+
   const loadUserConfig = async ({ withLoading } = {}) => {
     const shouldShowLoader =
       typeof withLoading === 'boolean'
@@ -112,10 +175,15 @@ export const useSidebar = () => {
         setLoading(true);
       }
 
+      // 未登录状态下不请求 /api/user/self，避免登录页触发全局 401 弹窗。
+      if (!hasLocalUserSession()) {
+        setUserConfig(buildDefaultUserConfig(adminConfig));
+        return;
+      }
+
       const res = await API.get('/api/user/self');
       if (res.data.success && res.data.data.sidebar_modules) {
         let config;
-        // 检查sidebar_modules是字符串还是对象
         if (typeof res.data.data.sidebar_modules === 'string') {
           config = JSON.parse(res.data.data.sidebar_modules);
         } else {
@@ -123,39 +191,10 @@ export const useSidebar = () => {
         }
         setUserConfig(config);
       } else {
-        // 当用户没有配置时，生成一个基于管理员配置的默认用户配置
-        // 这样可以确保权限控制正确生效
-        const defaultUserConfig = {};
-        Object.keys(adminConfig).forEach((sectionKey) => {
-          if (adminConfig[sectionKey]?.enabled) {
-            defaultUserConfig[sectionKey] = { enabled: true };
-            // 为每个管理员允许的模块设置默认值为true
-            Object.keys(adminConfig[sectionKey]).forEach((moduleKey) => {
-              if (
-                moduleKey !== 'enabled' &&
-                adminConfig[sectionKey][moduleKey]
-              ) {
-                defaultUserConfig[sectionKey][moduleKey] = true;
-              }
-            });
-          }
-        });
-        setUserConfig(defaultUserConfig);
+        setUserConfig(buildDefaultUserConfig(adminConfig));
       }
     } catch (error) {
-      // 出错时也生成默认配置，而不是设置为空对象
-      const defaultUserConfig = {};
-      Object.keys(adminConfig).forEach((sectionKey) => {
-        if (adminConfig[sectionKey]?.enabled) {
-          defaultUserConfig[sectionKey] = { enabled: true };
-          Object.keys(adminConfig[sectionKey]).forEach((moduleKey) => {
-            if (moduleKey !== 'enabled' && adminConfig[sectionKey][moduleKey]) {
-              defaultUserConfig[sectionKey][moduleKey] = true;
-            }
-          });
-        }
-      });
-      setUserConfig(defaultUserConfig);
+      setUserConfig(buildDefaultUserConfig(adminConfig));
     } finally {
       if (shouldShowLoader) {
         setLoading(false);
@@ -164,13 +203,11 @@ export const useSidebar = () => {
     }
   };
 
-  // 刷新用户配置的方法（供外部调用）
   const refreshUserConfig = async () => {
     if (Object.keys(adminConfig).length > 0) {
       await loadUserConfig({ withLoading: false });
     }
 
-    // 触发全局刷新事件，通知所有useSidebar实例更新
     sidebarEventTarget.dispatchEvent(
       new CustomEvent(SIDEBAR_REFRESH_EVENT, {
         detail: { sourceId: instanceIdRef.current, skipLoader: true },
@@ -178,15 +215,12 @@ export const useSidebar = () => {
     );
   };
 
-  // 加载用户配置
   useEffect(() => {
-    // 只有当管理员配置加载完成后才加载用户配置
     if (Object.keys(adminConfig).length > 0) {
       loadUserConfig();
     }
   }, [adminConfig]);
 
-  // 监听全局刷新事件
   useEffect(() => {
     const handleRefresh = (event) => {
       if (event?.detail?.sourceId === instanceIdRef.current) {
@@ -210,42 +244,33 @@ export const useSidebar = () => {
     };
   }, [adminConfig]);
 
-  // 计算最终的显示配置
   const finalConfig = useMemo(() => {
     const result = {};
 
-    // 确保adminConfig已加载
     if (!adminConfig || Object.keys(adminConfig).length === 0) {
       return result;
     }
 
-    // 如果userConfig未加载，等待加载完成
     if (!userConfig) {
       return result;
     }
 
-    // 遍历所有区域
     Object.keys(adminConfig).forEach((sectionKey) => {
       const adminSection = adminConfig[sectionKey];
       const userSection = userConfig[sectionKey];
 
-      // 如果管理员禁用了整个区域，则该区域不显示
       if (!adminSection?.enabled) {
         result[sectionKey] = { enabled: false };
         return;
       }
 
-      // 区域级别：用户可以选择隐藏管理员允许的区域
-      // 当userSection存在时检查enabled状态，否则默认为true
       const sectionEnabled = userSection ? userSection.enabled !== false : true;
       result[sectionKey] = { enabled: sectionEnabled };
 
-      // 功能级别：只有管理员和用户都允许的功能才显示
       Object.keys(adminSection).forEach((moduleKey) => {
         if (moduleKey === 'enabled') return;
 
         const adminAllowed = adminSection[moduleKey];
-        // 当userSection存在时检查模块状态，否则默认为true
         const userAllowed = userSection
           ? userSection[moduleKey] !== false
           : true;
@@ -258,16 +283,13 @@ export const useSidebar = () => {
     return result;
   }, [adminConfig, userConfig]);
 
-  // 检查特定功能是否应该显示
   const isModuleVisible = (sectionKey, moduleKey = null) => {
     if (moduleKey) {
       return finalConfig[sectionKey]?.[moduleKey] === true;
-    } else {
-      return finalConfig[sectionKey]?.enabled === true;
     }
+    return finalConfig[sectionKey]?.enabled === true;
   };
 
-  // 检查区域是否有任何可见的功能
   const hasSectionVisibleModules = (sectionKey) => {
     const section = finalConfig[sectionKey];
     if (!section?.enabled) return false;
@@ -277,7 +299,6 @@ export const useSidebar = () => {
     );
   };
 
-  // 获取区域的可见功能列表
   const getVisibleModules = (sectionKey) => {
     const section = finalConfig[sectionKey];
     if (!section?.enabled) return [];

@@ -22,6 +22,7 @@ import { Card, Avatar, Skeleton, Tag } from '@douyinfe/semi-ui';
 import { VChart } from '@visactor/react-vchart';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useSidebar } from '../../hooks/common/useSidebar';
 
 const StatsCards = ({
   groupedStatsData,
@@ -32,6 +33,10 @@ const StatsCards = ({
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { loading: sidebarLoading, isModuleVisible } = useSidebar();
+  const canAccessTopup =
+    !sidebarLoading && isModuleVisible('personal', 'topup');
+
   return (
     <div className='mb-4'>
       <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'>
@@ -80,7 +85,7 @@ const StatsCards = ({
                       </div>
                     </div>
                   </div>
-                  {item.title === t('当前余额') ? (
+                  {item.title === t('当前余额') && canAccessTopup ? (
                     <Tag
                       color='white'
                       shape='circle'

@@ -29,20 +29,23 @@
 
 | 路径 | 页面 | 权限 |
 |---|---|---|
-| `/console/models` | ModelPage | AdminRoute |
-| `/console/deployment` | ModelDeploymentPage | AdminRoute |
-| `/console/channel` | Channel | AdminRoute |
-| `/console/redemption` | Redemption | AdminRoute |
-| `/console/user` | User | AdminRoute |
-| `/console/token` | Token | PrivateRoute |
-| `/console/playground` | Playground | PrivateRoute |
-| `/console/topup` | TopUp | PrivateRoute（按实际组件实现） |
-| `/console/log` | Log | PrivateRoute（按实际组件实现） |
-| `/console/setting` | Setting/PersonalSetting | PrivateRoute（按实际组件实现） |
-| `/console/chat` | Chat | PrivateRoute（按实际组件实现） |
-| `/console/midjourney` | Midjourney | PrivateRoute（按实际组件实现） |
-| `/console/task` | Task | PrivateRoute（按实际组件实现） |
-| `/console/pricing` | Pricing | 可能需要登录（受配置影响） |
+| `/console/models` | ModelPage | `AdminRoute` + `SidebarModuleRoute(admin.models)` |
+| `/console/deployment` | ModelDeploymentPage | `AdminRoute` + `SidebarModuleRoute(admin.deployment)` |
+| `/console/channel` | Channel | `AdminRoute` + `SidebarModuleRoute(admin.channel)` |
+| `/console/redemption` | Redemption | `AdminRoute` + `SidebarModuleRoute(admin.redemption)` |
+| `/console/user` | User | `AdminRoute` + `SidebarModuleRoute(admin.user)` |
+| `/console/setting` | Setting | `AdminRoute` + `SidebarModuleRoute(admin.setting)` |
+| `/console/token` | Token | `PrivateRoute` + `SidebarModuleRoute(console.token)` |
+| `/console` | ConsoleLandingRoute（按权限落地） | `PrivateRoute`；若有 `console.detail` 则进入 Dashboard，否则自动跳转到首个可见控制台模块（如 token/log） |
+| `/console/log` | Log | `PrivateRoute` + `SidebarModuleRoute(console.log)` |
+| `/console/midjourney` | Midjourney | `PrivateRoute` + `SidebarModuleRoute(console.midjourney)` |
+| `/console/task` | Task | `PrivateRoute` + `SidebarModuleRoute(console.task)` |
+| `/console/playground` | Playground | `PrivateRoute` + `SidebarModuleRoute(chat.playground)` |
+| `/console/topup` | TopUp | `PrivateRoute` + `SidebarModuleRoute(personal.topup)` |
+| `/console/personal` | PersonalSetting | `PrivateRoute` + `SidebarModuleRoute(personal.personal)` |
+| `/console/chat/:id?` | Chat | `PrivateRoute` + `SidebarModuleRoute(chat.chat)` |
 
-提示：控制台路由较多，以 `web/src/App.jsx` 为准，可按需补全此表。
+提示：
+- 侧边栏显示由 `useSidebar` 负责；路由访问由 `SidebarModuleRoute` 二次校验，防止隐藏模块被直接 URL 访问。
+- 控制台路由较多，以 `web/src/App.jsx` 为准。
 
